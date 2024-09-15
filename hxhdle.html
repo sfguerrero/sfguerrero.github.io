@@ -1,0 +1,966 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HxH DLE</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('https://static1.cbrimages.com/wordpress/wp-content/uploads/2019/10/HxH-Featured-Image.jpg') no-repeat center center fixed;
+            background-size: cover;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+        #guess-input {
+            width: 80%;
+            padding: 10px;
+            font-size: 16px;
+            margin: 20px 0;
+        }
+        #clues-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        #clues {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            flex: 1;
+        }
+        .clue-box {
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            opacity: 0; /* Initial opacity for animation */
+            animation: fadeIn 0.5s forwards; /* Apply animation */
+        }
+        .green {
+            background-color: #4CAF50;
+            color: #fff;
+        }
+        .red {
+            background-color: #f44336;
+            color: #fff;
+        }
+        .character-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+        .autocomplete-items {
+            position: absolute; /* Changed to absolute to position relative to the input */
+            border: 1px solid #d4d4d4;
+            background-color: #fff;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 99;
+            width: calc(80% - 22px); /* Adjust width to match the input */
+            left: 10%; /* Align with input field */
+            top: 75px; /* Adjust this value to position the dropdown correctly below the input */
+        }
+        .autocomplete-item {
+            padding: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .autocomplete-item img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            margin-right: 10px;
+            border-radius: 5px;
+        }
+        .autocomplete-item:hover {
+            background-color: #e9e9e9;
+        }
+        #status-indicators {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin: 5px;
+            border-radius: 5px;
+        }
+        .indicator-correct {
+            background-color: #4CAF50;
+        }
+        .indicator-partial {
+            background-color: #FFD700;
+        }
+        .indicator-incorrect {
+            background-color: #f44336;
+        }
+        
+        /* Animation for fading in clue boxes */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+</head>
+<body>
+    <h1>HxH DLE</h1>
+    <div id="game-container">
+        <input type="text" id="guess-input" placeholder="Type character name...">
+        <div id="clues-container">
+            <img id="character-image" src="" alt="Character Image" class="character-image" style="display: none;">
+            <div id="all-guesses"></div>
+        </div>
+        <div id="status-indicators">
+            <span class="status-indicator indicator-correct"></span> Correct
+            <span class="status-indicator indicator-partial"></span> Partial
+            <span class="status-indicator indicator-incorrect"></span> Incorrect
+        </div>
+    </div>
+    <script>
+        // Character data
+        var characters = [
+            // Add your character data here...
+            {
+        name: "Gon Freecss",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 12,
+        height: 154,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/3/3e/HxH2011_EP147_Gon_Portrait.png/revision/latest?cb=20230904181801"
+    },
+    {
+        name: "Killua Zoldyck",
+        gender: "Male",
+        nen_type: "Transmutation",
+        age: 12,
+        height: 158,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/b/bd/HxH2011_EP147_Killua_Portrait.png/revision/latest?cb=20230904181904"
+    },
+    {
+        name: "Kurapika",
+        gender: "Male",
+        nen_type: "Conjuration",
+        age: 17,
+        height: 171,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/8/8e/Kurapika_portrait_HXH_1999_EP69.png/revision/latest/scale-to-width/360?cb=20221203075309"
+    },
+    {
+        name: "Leorio Paradinight",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 19,
+        height: 193,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/d/d2/Leorio_portrait_1999.png/revision/latest?cb=20221202233720"
+    },
+    {
+        name: "Hisoka Morow",
+        gender: "Male",
+        nen_type: "Transmutation",
+        age: 28,
+        height: 187,
+        arc: "Hunter Exam",
+        image: "https://www.amaterasu.es/wp-content/uploads/2024/02/locura-hisoka-gon.jpg"
+    },
+    {
+        name: "Chrollo Lucilfer",
+        gender: "Male",
+        nen_type: "Specialization",
+        age: 26,
+        height: 177,
+        arc: "Yorknew City",
+        image: "https://i.imgur.com/0QXQZJD.jpeg"
+    },
+    {
+        name: "Biscuit Krueger",
+        gender: "Female",
+        nen_type: "Transmutation",
+        age: 57,
+        height: 159,
+        arc: "Greed Island",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/c/cd/Biscuit_Krueger_CA_Portrait.png/revision/latest?cb=20190630140152"
+    },
+    {
+        name: "Meruem",
+        gender: "Male",
+        nen_type: "Specialization",
+        age: 0, // in days
+        height: 160,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/5/58/Meruem_CA_Portrait.png/revision/latest?cb=20190419124312"
+    },
+    {
+        name: "Neferpitou",
+        gender: "Unknown",
+        nen_type: "Specialization",
+        age: 0, // in days
+        height: 175,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/2/20/109_-_Neferpitou_portrait.png/revision/latest?cb=20131218034405"
+    },
+    {
+        name: "Isaac Netero",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 110,
+        height: 160,
+        arc: "Hunter Exam",
+        image: "https://i.pinimg.com/originals/45/a5/ce/45a5ce97ad5b4fb79ba28b11fef3880c.jpg"
+    },
+    {
+        name: "Ging Freecss",
+        gender: "Male",
+        nen_type: "Unknown",
+        age: 32,
+        height: 170,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/3/3d/GingAv.png/revision/latest?cb=20181125230438"
+    },
+    {
+        name: "Kite",
+        gender: "Male",
+        nen_type: "Conjuration",
+        age: 28,
+        height: 182,
+        arc: "Greed Island",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/1/1d/Kite_CA_Portrait.png/revision/latest/scale-to-width/360?cb=20190127155247"
+    },
+    {
+        name: "Alluka Zoldyck",
+        gender: "Female",
+        nen_type: "Specialization",
+        age: 11,
+        height: 150,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/0/07/147_-_Alluka_face.png/revision/latest?cb=20170804080459"
+    },
+    {
+        name: "Illumi Zoldyck",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 24,
+        height: 185,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/4/4b/Illumi_1999.png/revision/latest?cb=20221206000206"
+    },
+    {
+        name: "Silva Zoldyck",
+        gender: "Male",
+        nen_type: "Transmutation",
+        age: 46,
+        height: 198,
+        arc: "Zoldyck Family",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/0/0a/HxH2011_EP117_Silva_Portrait.png/revision/latest?cb=20230215181043"
+    },
+    {
+        name: "Zeno Zoldyck",
+        gender: "Male",
+        nen_type: "Transmutation",
+        age: 67,
+        height: 161,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/4/4f/Zeno_Zoldyck_YC_Portrait.png/revision/latest?cb=20190123184544"
+    },
+    {
+        name: "Palm Siberia",
+        gender: "Female",
+        nen_type: "Enhancement",
+        age: 22,
+        height: 162,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/7/75/Palm_Siberia_%28Ant%29_CA_Portrait.png/revision/latest?cb=20140620234253"
+    },
+    {
+        name: "Morel Mackernasey",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 46,
+        height: 199,
+        arc: "Chimera Ant",
+        image: "https://preview.redd.it/8rjll1xwag591.jpg?width=1920&format=pjpg&auto=webp&s=a66b190d7e17bead3d4968be85b6c356b1559533"
+    },
+    {
+        name: "Knov",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 40,
+        height: 180,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/p__/images/c/c4/Knov_current.jpg/revision/latest?cb=20230503233932&path-prefix=protagonist"
+    },
+    {
+        name: "Shaiapouf",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 20,
+        height: 190,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/a/a2/109_-_Shaiapouf_portrait.png/revision/latest?cb=20150902224149"
+    },
+    {
+        name: "Menthuthuyoupi",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 20,
+        height: 210,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/7/79/109_-_Menthuthuyoupi_portrait.png/revision/latest?cb=20131218033843"
+    },
+    {
+        name: "Pakunoda",
+        gender: "Female",
+        nen_type: "Specialization",
+        age: 28,
+        height: 183,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/d/da/Pakunoda_YC_Portrait.png/revision/latest?cb=20190124184929"
+    },
+    {
+        name: "Uvogin",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 29,
+        height: 258,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/4/4d/Uvogin_HXH_1999_EP56_portrait.png/revision/latest?cb=20221210014126"
+    },
+    {
+        name: "Feitan Portor",
+        gender: "Male",
+        nen_type: "Transmutation",
+        age: 28,
+        height: 155,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/7/77/Feitan_portrait_HXH_99_EP61.png/revision/latest?cb=20221214223024"
+    },
+    {
+        name: "Shizuku Murasaki",
+        gender: "Female",
+        nen_type: "Conjuration",
+        age: 19,
+        height: 160,
+        arc: "Yorknew City",
+        image: "https://i.pinimg.com/736x/10/40/70/104070e69789cca993fdfb3d8a9df80f.jpg"
+    },
+    {
+        name: "Machi Komacine",
+        gender: "Female",
+        nen_type: "Transmutation",
+        age: 24,
+        height: 159,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/4/4c/Machi_Komacine_HA_Portrait.png/revision/latest?cb=20131116122706"
+    },
+    {
+        name: "Nobunaga Hazama",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 30,
+        height: 183,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/4/46/HxH2011_EP50_Nobunaga_Portrait.png/revision/latest?cb=20230122183803"
+    },
+    {
+        name: "Bonolenov Ndongo",
+        gender: "Male",
+        nen_type: "Conjuration",
+        age: 30,
+        height: 210,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/f/fc/HxH2011_EP96_Bonolenov_Portrait.png/revision/latest?cb=20230123153232"
+    },
+    
+
+    {
+        name: "Kikyo Zoldyck",
+        gender: "Female",
+        nen_type: "Unknown",
+        age: 42,
+        height: 170,
+        arc: "Zoldyck Family",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/8/87/Kikyo_Zoldyck_ZF_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190630232207"
+    },
+
+    {
+        name: "Milluki Zoldyck",
+        gender: "Male",
+        nen_type: "None",
+        age: 19,
+        height: 182,
+        arc: "Zoldyck Family",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/8/89/Milluki_Zoldyck_1999.png/revision/latest?cb=20221202123512"
+    },
+
+    {
+        name: "Kalluto Zoldyck",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 10,
+        height: 140,
+        arc: "Zoldyck Family",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/2/21/Kalluto_Zoldyck_GI_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190127011052"
+    },
+
+    {
+        name: "Tsubone",
+        gender: "Female",
+        nen_type: "Conjuration",
+        age: "75",
+        height: "182",
+        arc: "Election",
+        image: "https://images.uncyc.org/pt/c/ca/Tsubone.png"
+    },
+    {
+        name: "Maha Zoldyck",
+        gender: "Male",
+        nen_type: "Unknown",
+        age: "Unknown",
+        height: "Unknown",
+        arc: "Zoldyck Family",
+        image: "https://cdn.myanimelist.net/s/common/uploaded_files/1448448699-b5cd235615e50e6c97bd7d6bd95e46c6.png"
+    },
+    {
+        name: "Neon Nostrade",
+        gender: "Female",
+        nen_type: "Specialization",
+        age: 16,
+        height: 152,
+        arc: "Yorknew City",
+        image: "https://i.pinimg.com/originals/47/89/96/478996feb6f839fa6d7e3f64bf023e92.jpg"
+    },
+    {
+        name: "Razor",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 35,
+        height: 196,
+        arc: "Greed Island",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/a/a0/Razor.png/revision/latest/scale-to-width/360?cb=20180717153630&path-prefix=de"
+    },
+    {
+        name: "Genthru",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 28,
+        height: 180,
+        arc: "Greed Island",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/0/0f/Genthru_Portrait_2011.png/revision/latest?cb=20230521235202"
+    },
+    {
+        name: "Komugi",
+        gender: "Female",
+        nen_type: "None",
+        age: 17,
+        height: 140,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/f/f1/Komugi_CA_Portrait.png/revision/latest?cb=20131121184842"
+    },
+    {
+        name: "Pariston Hill",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 38,
+        height: 178,
+        arc: "Election",
+        image: "https://i.redd.it/5y2q6d7yen381.jpg"
+    },
+ 
+    {
+        name: "Cheadle Yorkshire",
+        gender: "Female",
+        nen_type: "Emission",
+        age: 30,
+        height: 160,
+        arc: "Election",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/0/01/Cheadle_Yorkshire_HCE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20181224123712"
+    },
+    {
+        name: "Menchi",
+        gender: "Female",
+        nen_type: "Enhancement",
+        age: 21,
+        height: 168,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/f/f6/Menchi_HE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190125001226"
+    },
+    {
+        name: "Tsezguerra",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 46,
+        height: 177,
+        arc: "Greed Island",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/f/f8/Tsezguerra_GI_Portrait.png/revision/latest/scale-to-width-down/130?cb=20181225070425"
+    },
+    {
+        name: "Knuckle Bine",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 29,
+        height: 182,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/6/6f/Knuckle_Bine_CA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20230613232331"
+    },
+    {
+        name: "Melody",
+        gender: "Female",
+        nen_type: "Unknown",
+        age: 24,
+        height: 152,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/5/5f/Melody_YC_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190603215612"
+    },
+    {
+        name: "Pokkle",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 20,
+        height: 175,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/3/37/Pokkle_HE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20130503123042"
+    },
+    {
+        name: "Satotz",
+        gender: "Male",
+        nen_type: "Unknown",
+        age: "Unknown",
+        height: 191,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/f/f7/Satotz_HE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20181225155814"
+    },
+    {
+        name: "Wing",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 30,
+        height: 182,
+        arc: "Heavens Arena",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/2/2d/Wing_HA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20130503120536"
+    },
+    {
+        name: "Shoot McMahon",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 28,
+        height: 176,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/8/8f/Shoot_McMahon_CA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20181214004948"
+    },
+    {
+        name: "Ponzu",
+        gender: "Female",
+        nen_type: "None",
+        age: 19,
+        height: 160,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/0/06/Ponzu_HE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190124215252"
+    },
+    {
+        name: "Tonpa",
+        gender: "Male",
+        nen_type: "None",
+        age: 46,
+        height: 172,
+        arc: "Hunter Exam",
+        image: "https://i.redd.it/x0vdzl1t9ja51.jpg"
+    },
+    {
+        name: "Mito Freecss",
+        gender: "Female",
+        nen_type: "None",
+        age: 35,
+        height: 167,
+        arc: "Hunter Exam",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/5/59/Mito_Freecss_HE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20130502200924"
+    },
+    {
+        name: "Gotoh",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 41,
+        height: 185,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/e/eb/Gotoh_HCE_Portrait.png/revision/latest/scale-to-width-down/130?cb=20181227014255"
+    },
+    {
+        name: "Canary",
+        gender: "Female",
+        nen_type: "Unknown",
+        age: 16,
+        height: 160,
+        arc: "Zoldyck Family",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/2/22/Canary_ZF_Portrait.png/revision/latest/scale-to-width-down/130?cb=20130502183228"
+    },
+    {
+        name: "Zushi",
+        gender: "Male",
+        nen_type: "Unknown",
+        age: 10,
+        height: 140,
+        arc: "Heavens Arena",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/8/8b/Zushi_HA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190530161818"
+    },
+    {
+        name: "Phinks Magcub",
+        gender: "Male",
+        nen_type: "Enhancement",
+        age: 33,
+        height: 185,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/7/78/Phinks_Magcub_CA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190629152712"
+    },
+    {
+        name: "Franklin Bordeau",
+        gender: "Male",
+        nen_type: "Emission",
+        age: 34,
+        height: 219,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/b/bc/Franklin_Bordeau_YC_Portrait.png/revision/latest/scale-to-width-down/130?cb=20120729221501"
+    },
+    {
+        name: "Shalnark",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: 24,
+        height: 180,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/d/dc/Shalnark_GI_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190124183829"
+    },
+    {
+        name: "Kortopi",
+        gender: "Male",
+        nen_type: "Conjuration",
+        age: 30,
+        height: 160,
+        arc: "Yorknew City",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/b/b2/Kortopi_YC_Portrait.png/revision/latest/scale-to-width-down/130?cb=20120729221619"
+    },
+    {
+        name: "Chimera Ant Queen",
+        gender: "Female",
+        nen_type: "None",
+        age: "Unknown",
+        height: 300,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/4/45/Chimera_Ant_Queen_CA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20190127161006"
+    },
+    {
+        name: "Ikalgo",
+        gender: "Male",
+        nen_type: "Manipulation",
+        age: "Unknown",
+        height: 95,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/7/79/Ikalgo_CA_Portrait.png/revision/latest/scale-to-width-down/130?cb=20181217000208"
+    },
+    {
+        name: "Meleoron",
+        gender: "Male",
+        nen_type: "Specialization",
+        age: "Unknown",
+        height: 165,
+        arc: "Chimera Ant",
+        image: "https://static.wikia.nocookie.net/hunterxhunter/images/7/7f/EP127_Meleoron_Portrait.png/revision/latest/scale-to-width-down/1000?cb=20230701134947"
+    }
+            // ... (rest of the character data)
+        ];
+
+        // Randomly select a character as the answer
+        var answer = characters[Math.floor(Math.random() * characters.length)];
+        console.log(answer);
+
+        var guessInput = document.getElementById('guess-input');
+        var cluesDiv = document.getElementById('clues');
+        var characterImage = document.getElementById('character-image');
+
+        // **Define the guessedCharacters array**
+        var guessedCharacters = [];
+
+        function autocomplete(inp, arr) {
+        var currentFocus;
+        inp.addEventListener("input", function(e) {
+            var a, b, i, val = this.value;
+            closeAllLists();
+            if (!val) { return false; }
+            currentFocus = -1;
+            a = document.createElement("DIV");
+            a.setAttribute("id", this.id + "autocomplete-list");
+            a.setAttribute("class", "autocomplete-items");
+            this.parentNode.appendChild(a);
+            
+            // Adjust the number of maximum suggestions
+            let maxSuggestions = 10;
+            let count = 0;
+
+            // Loop through all characters
+            for (i = 0; i < arr.length; i++) {
+                // Skip characters that have already been guessed
+                if (guessedCharacters.includes(arr[i].name)) {
+                    continue;
+                }
+
+                // Split name into first and last names
+                let nameParts = arr[i].name.split(" ");
+                let firstName = nameParts[0];
+                let lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+
+                // Check if input matches the beginning of the first or last name (case-insensitive)
+                if (firstName.toLowerCase().startsWith(val.toLowerCase()) || lastName.toLowerCase().startsWith(val.toLowerCase())) {
+                    // Create a dropdown item if the input matches
+                    b = document.createElement("DIV");
+                    b.classList.add("autocomplete-item");
+
+                    // Determine which part of the name matches
+                    let highlightedName;
+                    if (firstName.toLowerCase().startsWith(val.toLowerCase())) {
+                        // Highlight the matching part in the first name
+                        highlightedName = "<strong>" + firstName.substr(0, val.length) + "</strong>" + firstName.substr(val.length) + " " + lastName;
+                    } else {
+                        // Highlight the matching part in the last name
+                        highlightedName = firstName + " " + "<strong>" + lastName.substr(0, val.length) + "</strong>" + lastName.substr(val.length);
+                    }
+
+                    // Set up the HTML content for the dropdown item
+                    b.innerHTML = "<img src='" + arr[i].image + "' alt='" + arr[i].name + "'>";
+                    b.innerHTML += highlightedName;
+                    b.innerHTML += "<input type='hidden' value='" + arr[i].name + "'>";
+                    
+                    b.addEventListener("click", function(e) {
+                        // Set the input field value to the clicked character's name
+                        inp.value = this.getElementsByTagName("input")[0].value;
+                        closeAllLists();
+
+                        // Call checkGuess to submit the selected character
+                        checkGuess();
+                    });
+                    
+                    a.appendChild(b);
+                    count++;
+
+                    // Limit the number of suggestions shown
+                    if (count >= maxSuggestions) {
+                        break;
+                    }
+                }
+            }
+        });
+
+        inp.addEventListener("keydown", function(e) {
+            var x = document.getElementById(this.id + "autocomplete-list");
+            if (x) x = x.getElementsByClassName("autocomplete-item");
+            if (e.keyCode == 40) { // Down arrow key
+                currentFocus++;
+                addActive(x);
+            } else if (e.keyCode == 38) { // Up arrow key
+                currentFocus--;
+                addActive(x);
+            } else if (e.keyCode == 13) { // Enter key
+                e.preventDefault();
+                if (currentFocus > -1) {
+                    if (x) x[currentFocus].click();
+                } else {
+                    checkGuess();
+                }
+            }
+        });
+
+        function addActive(x) {
+            if (!x) return false;
+            removeActive(x);
+            if (currentFocus >= x.length) currentFocus = 0;
+            if (currentFocus < 0) currentFocus = (x.length - 1);
+            x[currentFocus].classList.add("autocomplete-active");
+        }
+
+        function removeActive(x) {
+            for (var i = 0; i < x.length; i++) {
+                x[i].classList.remove("autocomplete-active");
+            }
+        }
+
+        function closeAllLists(elmnt) {
+            var x = document.getElementsByClassName("autocomplete-items");
+            for (var i = 0; i < x.length; i++) {
+                if (elmnt != x[i] && elmnt != inp) {
+                    x[i].parentNode.removeChild(x[i]);
+                }
+            }
+        }
+
+        document.addEventListener("click", function (e) {
+            closeAllLists(e.target);
+        });
+    }
+
+    autocomplete(guessInput, characters);
+
+
+        // Define the ordered list of arcs
+        const arcOrder = ["Hunter Exam", "Zoldyck Family", "Heavens Arena", "Yorknew City", "Greed Island", "Chimera Ant", "Election", "Succession War"];
+
+        // Helper function to compare arcs
+        function compareArcs(guessedArc, correctArc) {
+            const guessedIndex = arcOrder.indexOf(guessedArc);
+            const correctIndex = arcOrder.indexOf(correctArc);
+
+            if (guessedIndex < correctIndex) {
+                return " ↑"; // Guess is earlier
+            } else if (guessedIndex > correctIndex) {
+                return " ↓"; // Guess is later
+            } else {
+                return ""; // Guess is correct
+            }
+        }
+
+        function checkGuess() {
+            var guessName = guessInput.value.trim();
+            var guessedCharacter = characters.find(function(char) {
+                return char.name.toLowerCase() === guessName.toLowerCase();
+            });
+
+            // Clear the input field
+            guessInput.value = '';
+
+
+            // **Add the guessed character's name to the guessedCharacters array**
+            guessedCharacters.push(guessedCharacter.name);
+
+            // Create a new container for this guess
+            var guessContainer = document.createElement('div');
+            guessContainer.classList.add('guess-container');
+            guessContainer.style.display = 'flex';
+            guessContainer.style.alignItems = 'center';
+            guessContainer.style.marginBottom = '20px';
+
+            // Create image element
+            var characterImage = document.createElement('img');
+            characterImage.src = guessedCharacter.image;
+            characterImage.alt = guessedCharacter.name;
+            characterImage.classList.add('character-image');
+            characterImage.style.width = '100px';
+            characterImage.style.height = '100px';
+            characterImage.style.objectFit = 'cover';
+            characterImage.style.borderRadius = '10px';
+            characterImage.style.marginRight = '20px';
+
+            // Create a container for the clues
+            var cluesDiv = document.createElement('div');
+            cluesDiv.style.display = 'grid';
+            cluesDiv.style.gridTemplateColumns = 'repeat(5, 1fr)';
+            cluesDiv.style.gap = '10px';
+
+            // Check if the guess is correct
+            var isCorrect = guessedCharacter.name === answer.name;
+
+            // Create clues and set their animations
+            var clues = [
+                { text: "Gender: " + guessedCharacter.gender, match: guessedCharacter.gender === answer.gender },
+                { text: "Nen Type: " + guessedCharacter.nen_type, match: guessedCharacter.nen_type === answer.nen_type },
+                {
+                    text: "Age: " + guessedCharacter.age + (guessedCharacter.age !== answer.age ? (guessedCharacter.age < answer.age ? " ↑" : " ↓") : ""),
+                    match: guessedCharacter.age === answer.age
+                },
+                {
+                    text: "Height: " + guessedCharacter.height + " cm" + (guessedCharacter.height !== answer.height ? (guessedCharacter.height < answer.height ? " ↑" : " ↓") : ""),
+                    match: guessedCharacter.height === answer.height
+                },
+                {
+                    text: "Arc: " + guessedCharacter.arc + compareArcs(guessedCharacter.arc, answer.arc),
+                    match: guessedCharacter.arc === answer.arc
+                }
+            ];
+
+            clues.forEach((clue, index) => {
+                var clueBox = document.createElement('div');
+                clueBox.classList.add('clue-box');
+                clueBox.innerHTML = clue.text;
+                if (isCorrect || clue.match) {
+                    clueBox.classList.add('green');
+                } else {
+                    clueBox.classList.add('red');
+                }
+                // Add a delay for the animation
+                clueBox.style.animationDelay = `${index * 0.5}s`; // 0.5s delay between each box
+                cluesDiv.appendChild(clueBox);
+            });
+
+            // Add image and clues to the guess container
+            guessContainer.appendChild(characterImage);
+            guessContainer.appendChild(cluesDiv);
+
+            // Add this guess container to the top of the #all-guesses container
+            var allGuessesContainer = document.getElementById('all-guesses');
+            allGuessesContainer.insertBefore(guessContainer, allGuessesContainer.firstChild);
+
+            // Trigger fireworks if the guess is correct
+            if (isCorrect) {
+                setTimeout(() => {
+                    launchFireworks();
+                }, clues.length * 500); // Wait for all animations to finish
+            }
+        }
+
+        // **Add an event listener for the Enter key to submit the guess**
+        guessInput.addEventListener("keydown", function(e) {
+            if (e.keyCode === 13) { // Enter key
+                e.preventDefault();
+                checkGuess();
+            }
+        });
+
+        // **Define the launchFireworks function**
+        function launchFireworks() {
+            var duration = 5 * 1000;
+            var animationEnd = Date.now() + duration;
+            var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1000 };
+
+            function randomInRange(min, max) {
+                return Math.random() * (max - min) + min;
+            }
+
+            var interval = setInterval(function() {
+                var timeLeft = animationEnd - Date.now();
+
+                if (timeLeft <= 0) {
+                    return clearInterval(interval);
+                }
+
+                var particleCount = 50 * (timeLeft / duration);
+                // Since particles fall down, start a bit higher than random
+                confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+                confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+            }, 250);
+        }
+
+    </script>
+</body>
+</html>
